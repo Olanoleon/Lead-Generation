@@ -25,6 +25,52 @@ interface Company {
   website: string | null;
   phone: string | null;
   address: string | null;
+  estimatedSize: string | null;
+}
+
+// Estimate company size range based on available data
+function estimateCompanySize(snippet: string): string | null {
+  const text = snippet.toLowerCase();
+  
+  // Try to find explicit employee count mentions
+  const employeePatterns = [
+    /(\d{1,5})\+?\s*(?:employees?|staff|workers|people|team members)/i,
+    /(?:employees?|staff|team|workforce)\s*(?:of\s*)?(\d{1,5})/i,
+    /(?:over|more than|about|approximately|around)\s*(\d{1,5})\s*(?:employees?|staff)/i,
+  ];
+  
+  for (const pattern of employeePatterns) {
+    const match = snippet.match(pattern);
+    if (match) {
+      const count = parseInt(match[1]);
+      return getSizeRange(count);
+    }
+  }
+  
+  // Check for size indicators in text
+  if (text.includes('enterprise') || text.includes('fortune 500') || text.includes('multinational')) {
+    return '500+';
+  }
+  if (text.includes('mid-size') || text.includes('midsize') || text.includes('medium-sized')) {
+    return '100-500';
+  }
+  if (text.includes('small business') || text.includes('local business') || text.includes('family-owned')) {
+    return '1-25';
+  }
+  if (text.includes('startup') || text.includes('start-up')) {
+    return '1-25';
+  }
+  
+  return null;
+}
+
+// Convert employee count to size range
+function getSizeRange(count: number): string {
+  if (count <= 25) return '1-25';
+  if (count <= 50) return '26-50';
+  if (count <= 100) return '51-100';
+  if (count <= 500) return '100-500';
+  return '500+';
 }
 
 interface Contact {
@@ -78,6 +124,9 @@ function extractLinkedInContact(result: SerperResult, company: Company, industry
     return null;
   }
   
+  // Try to extract company size from snippet if not already set
+  const companySize = company.estimatedSize || estimateCompanySize(snippet);
+  
   return {
     company_name: company.name,
     contact_name: contactName,
@@ -88,7 +137,7 @@ function extractLinkedInContact(result: SerperResult, company: Company, industry
     website: company.website,
     industry: industry,
     location: location,
-    company_size: null,
+    company_size: companySize,
     additional_info: {
       source: 'linkedin_search',
       snippet: snippet,
@@ -108,6 +157,9 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
   // Try to find phone in snippet
   const phoneMatch = snippet.match(/(\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/);
   const phone = phoneMatch ? phoneMatch[1] : company.phone;
+  
+  // Try to extract company size from snippet if not already set
+  const companySize = company.estimatedSize || estimateCompanySize(snippet);
   
   // Try to extract person name and title from snippet
   // Common patterns: "John Smith, CEO", "Jane Doe - Marketing Director"
@@ -129,7 +181,7 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
         website: company.website,
         industry: industry,
         location: location,
-        company_size: null,
+        company_size: companySize,
         additional_info: {
           source: 'website_search',
           found_on: link,
@@ -158,7 +210,7 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
         website: company.website,
         industry: industry,
         location: location,
-        company_size: null,
+        company_size: companySize,
         additional_info: {
           source: 'email_extraction',
           found_on: link,
@@ -316,11 +368,22 @@ export async function POST(request: NextRequest) {
       if (placesData.places) {
         for (const place of placesData.places) {
           if (!companies.some(c => c.name.toLowerCase() === place.title.toLowerCase())) {
+            // Try to estimate size from reviews count (rough heuristic)
+            let estimatedSize: string | null = null;
+            if (place.reviews) {
+              // Companies with more reviews tend to be larger
+              if (place.reviews > 500) estimatedSize = '100-500';
+              else if (place.reviews > 100) estimatedSize = '51-100';
+              else if (place.reviews > 30) estimatedSize = '26-50';
+              else estimatedSize = '1-25';
+            }
+            
             companies.push({
               name: place.title,
               website: place.website || null,
               phone: place.phone || null,
               address: place.address || null,
+              estimatedSize: estimatedSize,
             });
           }
         }
@@ -367,11 +430,15 @@ export async function POST(request: NextRequest) {
           }
           
           if (companyName && !companies.some(c => c.name.toLowerCase() === companyName.toLowerCase())) {
+            // Try to estimate company size from the search snippet
+            const estimatedSize = estimateCompanySize(result.snippet || '');
+            
             companies.push({
               name: companyName,
               website: website,
               phone: null,
               address: null,
+              estimatedSize: estimatedSize,
             });
           }
         }

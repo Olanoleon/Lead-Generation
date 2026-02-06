@@ -2,12 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Search, LayoutDashboard, History, Bookmark, Settings, HelpCircle, Zap } from 'lucide-react';
+import { Search, LayoutDashboard, Bookmark, Settings, HelpCircle, Zap } from 'lucide-react';
 
 const navItems = [
   { name: 'Search', href: '/', icon: Search },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'History', href: '/history', icon: History },
   { name: 'Saved Criteria', href: '/saved', icon: Bookmark },
 ];
 
