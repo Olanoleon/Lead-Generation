@@ -64,7 +64,20 @@ export default function SearchDetailPage() {
     try {
       // Fetch search iteration details
       const searchRes = await fetch(`/api/searches/${searchId}`);
+      
+      if (!searchRes.ok) {
+        const errorData = await searchRes.json();
+        throw new Error(errorData.error || `Failed to fetch search (${searchRes.status})`);
+      }
+      
       const searchData = await searchRes.json();
+      
+      // Validate that we got proper search data
+      if (!searchData || !searchData.industry || !searchData.location) {
+        console.error('Invalid search data received:', searchData);
+        throw new Error('Invalid search data - missing industry or location');
+      }
+      
       setSearch(searchData);
 
       // Fetch leads for this search
@@ -80,7 +93,7 @@ export default function SearchDetailPage() {
       }
     } catch (error) {
       console.error('Failed to fetch search details:', error);
-      setError('Failed to load search details');
+      setError(error instanceof Error ? error.message : 'Failed to load search details');
     } finally {
       setIsLoading(false);
     }

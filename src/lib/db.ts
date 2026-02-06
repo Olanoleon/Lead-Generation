@@ -1,6 +1,32 @@
-import { neon } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
-const sql = neon(process.env.DATABASE_URL!);
+// Create a connection pool for PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // Required for Neon DB
+  },
+});
+
+// SQL tagged template function that mimics Neon's API
+async function sql(strings: TemplateStringsArray, ...values: unknown[]) {
+  // Build the query with numbered parameters ($1, $2, etc.)
+  let query = '';
+  strings.forEach((string, i) => {
+    query += string;
+    if (i < values.length) {
+      query += `$${i + 1}`;
+    }
+  });
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(query, values);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
 
 export default sql;
 

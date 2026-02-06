@@ -11,21 +11,43 @@ export async function GET(
   context: RouteContext
 ) {
   try {
-    const { id } = await context.params;
-    const searchId = parseInt(id);
+    const params = await context.params;
+    console.log('GET /api/searches/[id] - params:', params);
+    
+    const searchId = parseInt(params.id);
+    console.log('Fetching search with ID:', searchId);
+    
+    if (isNaN(searchId)) {
+      console.error('Invalid search ID:', params.id);
+      return NextResponse.json({ error: 'Invalid search ID' }, { status: 400 });
+    }
     
     const result = await sql`
       SELECT * FROM search_iterations WHERE id = ${searchId}
     `;
     
+    console.log('Database result:', result);
+    
     if (result.length === 0) {
       return NextResponse.json({ error: 'Search not found' }, { status: 404 });
     }
     
-    return NextResponse.json(result[0]);
+    // Ensure we return proper data
+    const searchData = result[0];
+    console.log('Returning search data:', {
+      id: searchData.id,
+      industry: searchData.industry,
+      location: searchData.location,
+      status: searchData.status
+    });
+    
+    return NextResponse.json(searchData);
   } catch (error) {
     console.error('Error fetching search:', error);
-    return NextResponse.json({ error: 'Failed to fetch search' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to fetch search',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
