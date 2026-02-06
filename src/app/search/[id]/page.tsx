@@ -75,7 +75,7 @@ export default function SearchDetailPage() {
         setLeads(leadsData.data);
         setFilteredLeads(leadsData.data);
       } else if (searchData.status === 'processing') {
-        // Auto-generate leads from Apollo.io if none exist
+        // Auto-generate leads using Serper API if none exist
         await generateLeads(searchData);
       }
     } catch (error) {
