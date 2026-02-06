@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 // GET /api/searches/[id] - Get a specific search iteration
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const searchId = parseInt(id);
     
     const result = await sql`
-      SELECT * FROM search_iterations WHERE id = ${id}
+      SELECT * FROM search_iterations WHERE id = ${searchId}
     `;
     
     if (result.length === 0) {
@@ -27,16 +32,17 @@ export async function GET(
 // PATCH /api/searches/[id] - Update a search iteration (e.g., status)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const searchId = parseInt(id);
     const { status } = await request.json();
     
     const result = await sql`
       UPDATE search_iterations 
       SET status = ${status}
-      WHERE id = ${id}
+      WHERE id = ${searchId}
       RETURNING *
     `;
     
@@ -54,12 +60,13 @@ export async function PATCH(
 // DELETE /api/searches/[id] - Delete a search iteration
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const searchId = parseInt(id);
     
-    await sql`DELETE FROM search_iterations WHERE id = ${id}`;
+    await sql`DELETE FROM search_iterations WHERE id = ${searchId}`;
     
     return NextResponse.json({ success: true });
   } catch (error) {

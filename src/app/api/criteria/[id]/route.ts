@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 // GET /api/criteria/[id] - Get a specific criteria
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const criteriaId = parseInt(id);
     
     const result = await sql`
-      SELECT * FROM saved_criteria WHERE id = ${id}
+      SELECT * FROM saved_criteria WHERE id = ${criteriaId}
     `;
     
     if (result.length === 0) {
@@ -27,10 +32,11 @@ export async function GET(
 // PATCH /api/criteria/[id] - Update a criteria
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const criteriaId = parseInt(id);
     const { name, industry, location, filters } = await request.json();
     
     const result = await sql`
@@ -40,7 +46,7 @@ export async function PATCH(
         industry = ${industry || null},
         location = ${location || null},
         filters = COALESCE(${filters ? JSON.stringify(filters) : null}, filters)
-      WHERE id = ${id}
+      WHERE id = ${criteriaId}
       RETURNING *
     `;
     
@@ -58,12 +64,13 @@ export async function PATCH(
 // DELETE /api/criteria/[id] - Delete a criteria
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await context.params;
+    const criteriaId = parseInt(id);
     
-    await sql`DELETE FROM saved_criteria WHERE id = ${id}`;
+    await sql`DELETE FROM saved_criteria WHERE id = ${criteriaId}`;
     
     return NextResponse.json({ success: true });
   } catch (error) {
