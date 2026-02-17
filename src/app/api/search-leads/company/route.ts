@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 const SERPER_URL = 'https://google.serper.dev/search';
 

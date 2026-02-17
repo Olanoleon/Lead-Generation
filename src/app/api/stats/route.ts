@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/stats - Get dashboard statistics
 export async function GET(request: NextRequest) {
   try {

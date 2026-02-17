@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/leads - Get leads for a search iteration
 export async function GET(request: NextRequest) {
   try {
