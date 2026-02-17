@@ -224,12 +224,15 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
   return null;
 }
 
+// Decision-maker roles to target in searches
+const DECISION_MAKER_ROLES = 'CEO OR CTO OR CFO OR COO OR CMO OR founder OR "co-founder" OR owner OR president OR "managing partner" OR "VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director" OR "Operations Director" OR "Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"';
+
 // Search for contacts at a specific company
 async function findCompanyContacts(company: Company, industry: string, location: string): Promise<Contact[]> {
   const contacts: Contact[] = [];
   
-  // Search for LinkedIn profiles of people at this company
-  const linkedInQuery = `site:linkedin.com/in "${company.name}" ${location}`;
+  // Search for LinkedIn profiles of decision makers at this company
+  const linkedInQuery = `site:linkedin.com/in "${company.name}" ${location} ${DECISION_MAKER_ROLES}`;
   
   try {
     const linkedInResponse = await fetch(SERPER_URL, {
@@ -301,7 +304,7 @@ async function findCompanyContacts(company: Company, industry: string, location:
   // If no contacts found, search for company + owner/CEO
   if (contacts.length === 0) {
     try {
-      const ownerQuery = `"${company.name}" ${location} (owner OR CEO OR founder OR president) contact`;
+      const ownerQuery = `"${company.name}" ${location} (${DECISION_MAKER_ROLES}) contact`;
       
       const ownerResponse = await fetch(SERPER_URL, {
         method: 'POST',
