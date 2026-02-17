@@ -37,18 +37,29 @@ export async function GET(request: NextRequest) {
 // POST /api/searches - Create a new search iteration
 export async function POST(request: NextRequest) {
   try {
-    const { userId, industry, location } = await request.json();
+    const { userId, industry, location, companyName, searchType = 'industry' } = await request.json();
     
-    if (!industry || !location) {
+    if (searchType === 'industry' && (!industry || !location)) {
       return NextResponse.json({ error: 'Industry and location are required' }, { status: 400 });
+    }
+    
+    if (searchType === 'company' && !companyName) {
+      return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
     }
     
     // Use default user if not provided
     const effectiveUserId = userId || 1;
     
     const result = await sql`
-      INSERT INTO search_iterations (user_id, industry, location, status) 
-      VALUES (${effectiveUserId}, ${industry}, ${location}, 'processing')
+      INSERT INTO search_iterations (user_id, industry, location, status, search_type, company_name) 
+      VALUES (
+        ${effectiveUserId}, 
+        ${industry || null}, 
+        ${location || null}, 
+        'processing',
+        ${searchType},
+        ${companyName || null}
+      )
       RETURNING *
     `;
     

@@ -8,6 +8,8 @@ interface SearchIteration {
   id: number;
   industry: string;
   location: string;
+  company_name: string | null;
+  search_type: 'industry' | 'company';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   total_leads: number;
   created_at: string;
@@ -210,55 +212,72 @@ export default function DashboardPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Industry</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Search Term</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Leads</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contacts</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {searches.map((search) => (
-                    <tr key={search.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(search.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getIndustryColor(search.industry)}`}>
-                          {search.industry}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {search.location}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {search.total_leads.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColors[search.status]}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            search.status === 'completed' ? 'bg-green-500' :
-                            search.status === 'processing' ? 'bg-yellow-500' :
-                            search.status === 'failed' ? 'bg-red-500' : 'bg-gray-500'
-                          }`}></span>
-                          {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/search/${search.id}`}
-                          className={`inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                            search.status === 'completed'
-                              ? 'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
-                        >
-                          <Eye className="w-4 h-4" />
-                          Preview
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {searches.map((search) => {
+                    const isCompany = search.search_type === 'company';
+                    const searchLabel = isCompany 
+                      ? search.company_name || 'Unknown' 
+                      : search.industry || 'Unknown';
+                    
+                    return (
+                      <tr key={search.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(search.created_at)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${
+                            isCompany 
+                              ? 'bg-purple-100 text-purple-700' 
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {isCompany ? 'Company' : 'Industry'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${
+                            isCompany 
+                              ? 'bg-purple-50 text-purple-700' 
+                              : getIndustryColor(search.industry)
+                          }`}>
+                            {searchLabel}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {search.location || '—'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {search.total_leads.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusColors[search.status]}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              search.status === 'completed' ? 'bg-green-500' :
+                              search.status === 'processing' ? 'bg-yellow-500' :
+                              search.status === 'failed' ? 'bg-red-500' : 'bg-gray-500'
+                            }`}></span>
+                            {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Link
+                            href={`/search/${search.id}`}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors bg-primary-50 text-primary-600 hover:bg-primary-100"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 

@@ -24,6 +24,8 @@ interface SearchIteration {
   id: number;
   industry: string;
   location: string;
+  company_name: string | null;
+  search_type: 'industry' | 'company';
   status: string;
   total_leads: number;
   created_at: string;
@@ -103,14 +105,17 @@ export default function SearchDetailPage() {
     setIsGenerating(true);
     setError(null);
     try {
-      // Call Serper API to search Google for leads
-      const searchRes = await fetch('/api/search-leads', {
+      // Choose API based on search type
+      const isCompanySearch = searchData.search_type === 'company';
+      const apiUrl = isCompanySearch ? '/api/search-leads/company' : '/api/search-leads';
+      const apiBody = isCompanySearch 
+        ? { companyName: searchData.company_name, location: searchData.location }
+        : { industry: searchData.industry, location: searchData.location };
+
+      const searchRes = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          industry: searchData.industry,
-          location: searchData.location,
-        }),
+        body: JSON.stringify(apiBody),
       });
 
       if (!searchRes.ok) {
@@ -211,7 +216,10 @@ export default function SearchDetailPage() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Lead Results</h1>
               <p className="text-sm text-gray-500">
-                {search?.industry} • {search?.location}
+                {search?.search_type === 'company' 
+                  ? `${search?.company_name}${search?.location ? ` • ${search.location}` : ''}`
+                  : `${search?.industry} • ${search?.location}`
+                }
               </p>
             </div>
           </div>
@@ -332,7 +340,10 @@ export default function SearchDetailPage() {
                 {error ? 'No leads found for this criteria' : 'Ready to fetch leads'}
               </p>
               <p className="text-sm text-gray-400 mb-4">
-                Search for "{search?.industry}" contacts in "{search?.location}" with LinkedIn profiles, emails, or phone numbers
+                {search?.search_type === 'company'
+                  ? `Find contacts at "${search?.company_name}" with LinkedIn profiles, emails, or phone numbers`
+                  : `Search for "${search?.industry}" contacts in "${search?.location}" with LinkedIn profiles, emails, or phone numbers`
+                }
               </p>
               <button
                 onClick={() => search && generateLeads(search)}

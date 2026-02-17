@@ -41,8 +41,10 @@ export interface User {
 export interface SearchIteration {
   id: number;
   user_id: number;
-  industry: string;
-  location: string;
+  industry: string | null;
+  location: string | null;
+  company_name: string | null;
+  search_type: 'industry' | 'company';
   status: 'pending' | 'processing' | 'completed' | 'failed';
   total_leads: number;
   created_at: string;

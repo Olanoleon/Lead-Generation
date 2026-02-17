@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS search_iterations (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    industry VARCHAR(255) NOT NULL,
-    location VARCHAR(255) NOT NULL,
+    industry VARCHAR(255),
+    location VARCHAR(255),
+    company_name VARCHAR(255),
+    search_type VARCHAR(50) DEFAULT 'industry' CHECK (search_type IN ('industry', 'company')),
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
     total_leads INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
