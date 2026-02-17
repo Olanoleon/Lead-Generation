@@ -233,9 +233,10 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
 }
 
 // Decision-maker roles split into small batches for effective Google queries
+// Each role is quoted so Google matches it exactly within LinkedIn profiles
 const ROLE_BATCHES = [
-  'CEO OR CTO OR CFO OR COO OR CMO',
-  'founder OR "co-founder" OR owner OR president OR "managing partner"',
+  '"CEO" OR "CTO" OR "CFO" OR "COO" OR "CMO"',
+  '"Founder" OR "Co-Founder" OR "Owner" OR "President" OR "Managing Partner"',
   '"VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director"',
   '"Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"',
 ];
@@ -247,7 +248,7 @@ async function findCompanyContacts(company: Company, industry: string, location:
   // Search LinkedIn with each role batch separately for better results
   for (const roleBatch of ROLE_BATCHES) {
     try {
-      const linkedInQuery = `site:linkedin.com/in "${company.name}" ${location} (${roleBatch})`;
+      const linkedInQuery = `site:linkedin.com/in "${company.name}" ${roleBatch}`;
       const linkedInResponse = await fetch(SERPER_URL, {
         method: 'POST',
         headers: {

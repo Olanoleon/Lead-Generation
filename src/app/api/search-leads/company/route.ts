@@ -6,9 +6,10 @@ const SERPER_API_KEY = process.env.SERPER_API_KEY;
 const SERPER_URL = 'https://google.serper.dev/search';
 
 // Decision-maker roles split into small batches for effective Google queries
+// Each role is quoted so Google matches it exactly within LinkedIn profiles
 const ROLE_BATCHES = [
-  'CEO OR CTO OR CFO OR COO OR CMO',
-  'founder OR "co-founder" OR owner OR president OR "managing partner"',
+  '"CEO" OR "CTO" OR "CFO" OR "COO" OR "CMO"',
+  '"Founder" OR "Co-Founder" OR "Owner" OR "President" OR "Managing Partner"',
   '"VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director"',
   '"Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"',
 ];
@@ -266,7 +267,7 @@ export async function POST(request: NextRequest) {
     const locationPart = location ? ` ${location}` : '';
     for (const roleBatch of ROLE_BATCHES) {
       try {
-        const query = `site:linkedin.com/in "${companyName}"${locationPart} (${roleBatch})`;
+        const query = `site:linkedin.com/in "${companyName}" ${roleBatch}`;
         const response = await fetch(SERPER_URL, {
           method: 'POST',
           headers: {
