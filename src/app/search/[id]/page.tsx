@@ -75,9 +75,20 @@ export default function SearchDetailPage() {
       const searchData = await searchRes.json();
       
       // Validate that we got proper search data
-      if (!searchData || !searchData.industry || !searchData.location) {
+      if (!searchData || !searchData.id) {
         console.error('Invalid search data received:', searchData);
+        throw new Error('Invalid search data');
+      }
+      
+      // Validate based on search type
+      const isCompany = searchData.search_type === 'company';
+      if (!isCompany && (!searchData.industry || !searchData.location)) {
+        console.error('Invalid industry search data:', searchData);
         throw new Error('Invalid search data - missing industry or location');
+      }
+      if (isCompany && !searchData.company_name) {
+        console.error('Invalid company search data:', searchData);
+        throw new Error('Invalid search data - missing company name');
       }
       
       setSearch(searchData);
