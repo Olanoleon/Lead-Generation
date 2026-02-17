@@ -232,52 +232,42 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
   return null;
 }
 
-// Decision-maker roles split into small batches for effective Google queries
-// Each role is quoted so Google matches it exactly within LinkedIn profiles
-const ROLE_BATCHES = [
-  '"CEO" OR "CTO" OR "CFO" OR "COO" OR "CMO"',
-  '"Founder" OR "Co-Founder" OR "Owner" OR "President" OR "Managing Partner"',
-  '"VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director"',
-  '"Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"',
-];
+// Decision-maker roles as a single quoted string for Google search
+const DECISION_MAKER_ROLES = 'CEO OR CTO OR CFO OR COO OR CMO OR Founder OR Owner OR President OR VP OR Director OR Manager OR Partner';
 
 // Search for contacts at a specific company
 async function findCompanyContacts(company: Company, industry: string, location: string): Promise<Contact[]> {
   const contacts: Contact[] = [];
   
-  // Search LinkedIn with each role batch separately for better results
-  for (const roleBatch of ROLE_BATCHES) {
-    try {
-      const linkedInQuery = `site:linkedin.com/in "${company.name}" ${roleBatch}`;
-      const linkedInResponse = await fetch(SERPER_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': SERPER_API_KEY!,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: linkedInQuery,
-          num: 10,
-        }),
-      });
+  // Search LinkedIn for decision makers at this company
+  try {
+    const linkedInQuery = `site:linkedin.com/in "${company.name}" "${DECISION_MAKER_ROLES}"`;
+    const linkedInResponse = await fetch(SERPER_URL, {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': SERPER_API_KEY!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: linkedInQuery,
+        num: 20,
+      }),
+    });
 
-      if (linkedInResponse.ok) {
-        const linkedInData = await linkedInResponse.json();
-        
-        if (linkedInData.organic) {
-          for (const result of linkedInData.organic) {
-            const contact = extractLinkedInContact(result, company, industry, location);
-            if (contact && !contacts.some(c => c.contact_name === contact.contact_name)) {
-              contacts.push(contact);
-            }
+    if (linkedInResponse.ok) {
+      const linkedInData = await linkedInResponse.json();
+      
+      if (linkedInData.organic) {
+        for (const result of linkedInData.organic) {
+          const contact = extractLinkedInContact(result, company, industry, location);
+          if (contact && !contacts.some(c => c.contact_name === contact.contact_name)) {
+            contacts.push(contact);
           }
         }
       }
-    } catch (error) {
-      console.error(`Error searching LinkedIn for ${company.name}:`, error);
     }
-
-    await new Promise(r => setTimeout(r, 100));
+  } catch (error) {
+    console.error(`Error searching LinkedIn for ${company.name}:`, error);
   }
 
   // Search for team/about pages on company website

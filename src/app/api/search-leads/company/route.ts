@@ -5,14 +5,8 @@ export const dynamic = 'force-dynamic';
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 const SERPER_URL = 'https://google.serper.dev/search';
 
-// Decision-maker roles split into small batches for effective Google queries
-// Each role is quoted so Google matches it exactly within LinkedIn profiles
-const ROLE_BATCHES = [
-  '"CEO" OR "CTO" OR "CFO" OR "COO" OR "CMO"',
-  '"Founder" OR "Co-Founder" OR "Owner" OR "President" OR "Managing Partner"',
-  '"VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director"',
-  '"Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"',
-];
+// Decision-maker roles as a single quoted string for Google search
+const DECISION_MAKER_ROLES = 'CEO OR CTO OR CFO OR COO OR CMO OR Founder OR Owner OR President OR VP OR Director OR Manager OR Partner';
 
 interface Contact {
   company_name: string;
@@ -263,31 +257,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Search LinkedIn for decision makers at this company
-    // Run one query per role batch to keep queries short and effective
-    const locationPart = location ? ` ${location}` : '';
-    for (const roleBatch of ROLE_BATCHES) {
-      try {
-        const query = `site:linkedin.com/in "${companyName}" ${roleBatch}`;
-        const response = await fetch(SERPER_URL, {
-          method: 'POST',
-          headers: {
-            'X-API-KEY': SERPER_API_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ q: query, num: 10 }),
-        });
+    try {
+      const query = `site:linkedin.com/in "${companyName}" "${DECISION_MAKER_ROLES}"`;
+      const response = await fetch(SERPER_URL, {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': SERPER_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, num: 20 }),
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          for (const result of (data.organic || [])) {
-            addContact(parseLinkedInResult(result, companyName, companyMeta));
-          }
+      if (response.ok) {
+        const data = await response.json();
+        for (const result of (data.organic || [])) {
+          addContact(parseLinkedInResult(result, companyName, companyMeta));
         }
-      } catch (error) {
-        console.error('LinkedIn search error:', error);
       }
-
-      await new Promise(r => setTimeout(r, 100));
+    } catch (error) {
+      console.error('LinkedIn search error:', error);
     }
 
     // Step 3: Search for team/leadership page on company website
