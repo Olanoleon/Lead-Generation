@@ -120,7 +120,7 @@ export default function SearchDetailPage() {
       const isCompanySearch = searchData.search_type === 'company';
       const apiUrl = isCompanySearch ? '/api/search-leads/company' : '/api/search-leads';
       const apiBody = isCompanySearch 
-        ? { companyName: searchData.company_name, location: searchData.location }
+        ? { companyName: searchData.company_name, location: searchData.location || '' }
         : { industry: searchData.industry, location: searchData.location };
 
       const searchRes = await fetch(apiUrl, {

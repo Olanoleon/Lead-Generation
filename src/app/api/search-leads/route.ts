@@ -126,6 +126,14 @@ function extractLinkedInContact(result: SerperResult, company: Company, industry
     return null;
   }
   
+  // Verify the result is related to the target company
+  const companyLower = company.name.toLowerCase();
+  const textToCheck = (title + ' ' + snippet).toLowerCase();
+  if (!textToCheck.includes(companyLower) && 
+      !textToCheck.includes(companyLower.replace(/\s+(inc|llc|ltd|corp|co|company|group|insurance|technologies|solutions)\.?$/i, '').trim())) {
+    return null; // Skip results not associated with the target company
+  }
+  
   // Try to extract company size from snippet if not already set
   const companySize = company.estimatedSize || estimateCompanySize(snippet);
   
@@ -239,7 +247,7 @@ async function findCompanyContacts(company: Company, industry: string, location:
   // Search LinkedIn with each role batch separately for better results
   for (const roleBatch of ROLE_BATCHES) {
     try {
-      const linkedInQuery = `site:linkedin.com/in "${company.name}" ${location} ${roleBatch}`;
+      const linkedInQuery = `site:linkedin.com/in "${company.name}" ${location} (${roleBatch})`;
       const linkedInResponse = await fetch(SERPER_URL, {
         method: 'POST',
         headers: {
@@ -312,7 +320,7 @@ async function findCompanyContacts(company: Company, industry: string, location:
   // If no contacts found, search for company + owner/CEO
   if (contacts.length === 0) {
     try {
-      const ownerQuery = `"${company.name}" ${location} (CEO OR CTO OR founder OR owner OR president OR director) contact`;
+      const ownerQuery = `"${company.name}" ${location} (CEO OR CTO OR founder OR owner OR president OR director) (email OR phone OR contact)`;
       
       const ownerResponse = await fetch(SERPER_URL, {
         method: 'POST',

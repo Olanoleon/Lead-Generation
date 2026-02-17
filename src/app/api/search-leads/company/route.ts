@@ -69,6 +69,14 @@ function parseLinkedInResult(
     return null;
   }
 
+  // Verify the result is actually related to the target company
+  const companyLower = companyName.toLowerCase();
+  const textToCheck = (title + ' ' + snippet).toLowerCase();
+  if (!textToCheck.includes(companyLower) && 
+      !textToCheck.includes(companyLower.replace(/\s+(inc|llc|ltd|corp|co|company|group|insurance|technologies|solutions)\.?$/i, '').trim())) {
+    return null; // Skip results not associated with the target company
+  }
+
   // Try to get more info from snippet
   if (!jobTitle) {
     const snippetTitleMatch = snippet.match(/(CEO|CTO|CFO|COO|VP|Director|Manager|Founder|Owner|President|Head of|Chief|Partner|Lead|Engineer|Developer|Architect)[\w\s]*/i);
@@ -255,9 +263,10 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Search LinkedIn for decision makers at this company
     // Run one query per role batch to keep queries short and effective
+    const locationPart = location ? ` ${location}` : '';
     for (const roleBatch of ROLE_BATCHES) {
       try {
-        const query = `site:linkedin.com/in "${companyName}" ${roleBatch}`;
+        const query = `site:linkedin.com/in "${companyName}"${locationPart} (${roleBatch})`;
         const response = await fetch(SERPER_URL, {
           method: 'POST',
           headers: {
@@ -315,8 +324,8 @@ export async function POST(request: NextRequest) {
 
     // Step 4: General web search for contacts
     const generalQueries = [
-      `"${companyName}" (CEO OR CTO OR CFO OR founder OR owner OR president) email OR phone OR contact`,
-      `"${companyName}" (director OR manager OR VP) email OR phone OR contact`,
+      `"${companyName}" (CEO OR CTO OR CFO OR founder OR owner OR president) (email OR phone OR contact)`,
+      `"${companyName}" (director OR manager OR VP) (email OR phone OR contact)`,
       `"${companyName}" team leadership contact`,
     ];
 
