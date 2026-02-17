@@ -5,8 +5,13 @@ export const dynamic = 'force-dynamic';
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 const SERPER_URL = 'https://google.serper.dev/search';
 
-// Decision-maker roles to target in searches
-const DECISION_MAKER_ROLES = 'CEO OR CTO OR CFO OR COO OR CMO OR founder OR "co-founder" OR owner OR president OR "managing partner" OR "VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director" OR "Operations Director" OR "Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"';
+// Decision-maker roles split into small batches for effective Google queries
+const ROLE_BATCHES = [
+  'CEO OR CTO OR CFO OR COO OR CMO',
+  'founder OR "co-founder" OR owner OR president OR "managing partner"',
+  '"VP of Sales" OR "VP of Marketing" OR "VP of Operations" OR "Sales Director" OR "Marketing Director"',
+  '"Operations Manager" OR "Business Development Manager" OR "General Manager" OR "HR Director" OR "Procurement Manager"',
+];
 
 interface Contact {
   company_name: string;
@@ -249,12 +254,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Search LinkedIn for decision makers at this company
-    const linkedInQueries = [
-      `site:linkedin.com/in "${companyName}" ${DECISION_MAKER_ROLES}`,
-    ];
-
-    for (const query of linkedInQueries) {
+    // Run one query per role batch to keep queries short and effective
+    for (const roleBatch of ROLE_BATCHES) {
       try {
+        const query = `site:linkedin.com/in "${companyName}" ${roleBatch}`;
         const response = await fetch(SERPER_URL, {
           method: 'POST',
           headers: {
@@ -282,7 +285,7 @@ export async function POST(request: NextRequest) {
       try {
         const domain = new URL(companyMeta.website).hostname;
         const teamQueries = [
-          `site:${domain} (team OR leadership OR "about us" OR "our team") (${DECISION_MAKER_ROLES})`,
+          `site:${domain} (team OR leadership OR "about us" OR "our team") (CEO OR CTO OR founder OR director OR manager)`,
           `site:${domain} (contact OR email) "@${domain.replace('www.', '')}"`,
         ];
 
@@ -312,7 +315,8 @@ export async function POST(request: NextRequest) {
 
     // Step 4: General web search for contacts
     const generalQueries = [
-      `"${companyName}" (${DECISION_MAKER_ROLES}) email OR phone OR contact`,
+      `"${companyName}" (CEO OR CTO OR CFO OR founder OR owner OR president) email OR phone OR contact`,
+      `"${companyName}" (director OR manager OR VP) email OR phone OR contact`,
       `"${companyName}" team leadership contact`,
     ];
 
