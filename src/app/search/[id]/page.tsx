@@ -80,15 +80,22 @@ export default function SearchDetailPage() {
         throw new Error('Invalid search data');
       }
       
-      // Validate based on search type
-      const isCompany = searchData.search_type === 'company';
-      if (!isCompany && (!searchData.industry || !searchData.location)) {
+      // Determine search type - fallback to 'company' if company_name exists
+      const isCompany = searchData.search_type === 'company' || 
+        (!searchData.industry && searchData.company_name);
+      
+      if (!isCompany && !searchData.industry) {
         console.error('Invalid industry search data:', searchData);
-        throw new Error('Invalid search data - missing industry or location');
+        throw new Error('Invalid search data - missing industry');
       }
       if (isCompany && !searchData.company_name) {
         console.error('Invalid company search data:', searchData);
         throw new Error('Invalid search data - missing company name');
+      }
+      
+      // Ensure search_type is set correctly for downstream use
+      if (isCompany) {
+        searchData.search_type = 'company';
       }
       
       setSearch(searchData);

@@ -52,18 +52,24 @@ export async function POST(request: NextRequest) {
     // Use default user if not provided
     const effectiveUserId = userId || 1;
     
+    const effectiveLocation = location || '';
+    
     const result = await sql`
       INSERT INTO search_iterations (user_id, industry, location, status, search_type, company_name) 
       VALUES (
         ${effectiveUserId}, 
         ${industry || null}, 
-        ${location || null}, 
+        ${effectiveLocation},
         'processing',
         ${searchType},
         ${companyName || null}
       )
       RETURNING *
     `;
+    
+    if (!result || result.length === 0) {
+      return NextResponse.json({ error: 'Failed to create search record' }, { status: 500 });
+    }
     
     return NextResponse.json(result[0], { status: 201 });
   } catch (error) {

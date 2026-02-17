@@ -125,11 +125,22 @@ function SearchPageContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           companyName, 
-          location: companyLocation || null,
+          location: companyLocation || '',
           searchType: 'company' 
         }),
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create search');
+      }
+      
       const search = await res.json();
+      
+      if (!search.id) {
+        throw new Error('No search ID returned');
+      }
+      
       router.push(`/search/${search.id}`);
     } catch (error) {
       console.error('Failed to create search:', error);
