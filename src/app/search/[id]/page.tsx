@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Download, Filter, Search, Mail, Phone, Linkedin, Globe, Building2, MapPin, Users, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
@@ -42,23 +42,50 @@ export default function SearchDetailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchSearchDetails();
   }, [searchId]);
 
+  // Get unique company names for the filter dropdown
+  const uniqueCompanies = Array.from(
+    new Set(leads.map(l => l.company_name).filter(Boolean))
+  ).sort() as string[];
+
   useEffect(() => {
+    let result = leads;
+
+    // Apply company filter
+    if (selectedCompany !== 'all') {
+      result = result.filter(lead => lead.company_name === selectedCompany);
+    }
+
+    // Apply text search
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      setFilteredLeads(leads.filter(lead => 
+      result = result.filter(lead => 
         lead.company_name?.toLowerCase().includes(query) ||
         lead.contact_name?.toLowerCase().includes(query) ||
         lead.email?.toLowerCase().includes(query)
-      ));
-    } else {
-      setFilteredLeads(leads);
+      );
     }
-  }, [searchQuery, leads]);
+
+    setFilteredLeads(result);
+  }, [searchQuery, selectedCompany, leads]);
 
   const fetchSearchDetails = async () => {
     setIsLoading(true);
@@ -332,10 +359,60 @@ export default function SearchDetailPage() {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
               />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Filter className="w-4 h-4" />
-              Filter
-            </button>
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                  selectedCompany !== 'all'
+                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    : 'border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                {selectedCompany !== 'all' ? selectedCompany : 'Filter by Company'}
+                {selectedCompany !== 'all' && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCompany('all');
+                      setIsFilterOpen(false);
+                    }}
+                    className="ml-1 text-primary-400 hover:text-primary-600 font-bold"
+                  >
+                    ×
+                  </span>
+                )}
+              </button>
+              {isFilterOpen && (
+                <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                  <div className="p-2">
+                    <button
+                      onClick={() => { setSelectedCompany('all'); setIsFilterOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                        selectedCompany === 'all' ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      All Companies ({leads.length} leads)
+                    </button>
+                    {uniqueCompanies.map(company => {
+                      const count = leads.filter(l => l.company_name === company).length;
+                      return (
+                        <button
+                          key={company}
+                          onClick={() => { setSelectedCompany(company); setIsFilterOpen(false); }}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
+                            selectedCompany === company ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="truncate">{company}</span>
+                          <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

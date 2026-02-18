@@ -75,6 +75,156 @@ function getSizeRange(count: number): string {
   return '500+';
 }
 
+const ROLE_KEYWORDS = [
+  'CEO', 'CTO', 'CFO', 'COO', 'CMO', 'CIO', 'CISO', 'CPO', 'CRO',
+  'Chief Executive', 'Chief Technology', 'Chief Financial', 'Chief Operating',
+  'Chief Marketing', 'Chief Innovation', 'Chief Strategy', 'Chief of Staff',
+  'Founder', 'Co-Founder', 'Co-founder', 'Owner', 'President',
+  'VP', 'Vice President',
+  'Director', 'Managing Director',
+  'Manager', 'General Manager',
+  'Partner', 'Chairman', 'Head of',
+];
+
+// Common English words that are NOT person names
+const NOT_NAMES = new Set([
+  'the', 'this', 'that', 'their', 'these', 'those', 'about', 'since', 'from',
+  'after', 'before', 'board', 'company', 'former', 'current', 'also', 'been',
+  'being', 'both', 'each', 'every', 'have', 'having', 'here', 'into', 'just',
+  'more', 'most', 'much', 'must', 'name', 'near', 'never', 'next', 'none',
+  'only', 'other', 'over', 'part', 'past', 'same', 'some', 'such', 'than',
+  'then', 'them', 'they', 'very', 'what', 'when', 'where', 'which', 'while',
+  'will', 'with', 'your', 'were', 'would', 'could', 'should', 'under', 'until',
+  'upon', 'well', 'read', 'learn', 'click', 'view', 'visit', 'search', 'find',
+  'join', 'sign', 'meet', 'our', 'his', 'her', 'its', 'new', 'old', 'all',
+  'and', 'are', 'but', 'for', 'had', 'has', 'how', 'not', 'now', 'off',
+  'who', 'why', 'yet', 'top', 'one', 'two', 'was', 'may', 'can', 'did',
+]);
+
+function isValidPersonName(name: string): boolean {
+  const parts = name.split(/\s+/);
+  if (parts.length < 2 || parts.length > 4) return false;
+  for (const part of parts) {
+    if (part.length < 2) return false;
+    if (!/^[A-ZÀ-Ÿ]/.test(part)) return false;
+    if (NOT_NAMES.has(part.toLowerCase())) return false;
+  }
+  if (name.length < 5) return false;
+  return true;
+}
+
+// Extract "Name: Role" or "Name, Role" pairs from free-form text
+function extractContactsFromText(
+  text: string,
+  company: Company,
+  industry: string,
+  location: string,
+): Contact[] {
+  const results: Contact[] = [];
+  if (!text) return results;
+
+  const rolePattern = ROLE_KEYWORDS.map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
+  const nameRolePatterns = [
+    new RegExp(`([A-Z][a-zà-ÿ'-]+(?:\\s+[A-Z][a-zà-ÿ'-]+)+)\\s*[:\\-–—]\\s*((?:${rolePattern})[^.\\n]*)`, 'g'),
+    new RegExp(`([A-Z][a-zà-ÿ'-]+(?:\\s+[A-Z][a-zà-ÿ'-]+)+),?\\s+((?:${rolePattern})[^.\\n]{0,60})`, 'g'),
+    new RegExp(`((?:${rolePattern})[^:\\-–—\\n]{0,30})\\s*[:\\-–—]\\s*([A-Z][a-zà-ÿ'-]+(?:\\s+[A-Z][a-zà-ÿ'-]+)+)`, 'g'),
+  ];
+
+  const seenNames = new Set<string>();
+
+  for (let pi = 0; pi < nameRolePatterns.length; pi++) {
+    const pattern = nameRolePatterns[pi];
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      let name: string;
+      let role: string;
+
+      if (pi === 2 || /^(CEO|CTO|CFO|COO|CMO|CIO|Chief|Founder|Co-|Owner|President|VP|Vice|Director|Managing|Manager|Partner|Chairman|Head)/i.test(match[1])) {
+        role = match[1].trim();
+        name = match[2].trim();
+      } else {
+        name = match[1].trim();
+        role = match[2].trim();
+      }
+
+      name = name.replace(/[,.:;()]+$/, '').trim();
+
+      if (!isValidPersonName(name)) continue;
+
+      const nameKey = name.toLowerCase();
+      if (!seenNames.has(nameKey)) {
+        seenNames.add(nameKey);
+        results.push({
+          company_name: company.name,
+          contact_name: name,
+          job_title: role.replace(/[,.:;()]+$/, '').trim(),
+          email: null,
+          phone: company.phone,
+          linkedin_url: null,
+          website: company.website,
+          industry: industry,
+          location: location,
+          company_size: company.estimatedSize || null,
+          additional_info: { source: 'google_ai_overview' },
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+// Collect all text from AI overview, answer box, and other rich Serper response fields
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function collectAIText(data: any): string {
+  const parts: string[] = [];
+
+  if (data.aiOverview) {
+    if (typeof data.aiOverview === 'string') {
+      parts.push(data.aiOverview);
+    } else if (data.aiOverview?.text) {
+      parts.push(data.aiOverview.text);
+    } else if (data.aiOverview?.contents) {
+      for (const block of data.aiOverview.contents) {
+        if (block.snippet) parts.push(block.snippet);
+        if (block.text) parts.push(block.text);
+        if (block.items) {
+          for (const item of block.items) {
+            if (typeof item === 'string') parts.push(item);
+            else if (item.snippet) parts.push(item.snippet);
+            else if (item.text) parts.push(item.text);
+          }
+        }
+      }
+    }
+  }
+
+  if (data.answerBox) {
+    if (data.answerBox.answer) parts.push(data.answerBox.answer);
+    if (data.answerBox.snippet) parts.push(data.answerBox.snippet);
+    if (data.answerBox.snippetHighlighted) {
+      parts.push(data.answerBox.snippetHighlighted.join(' '));
+    }
+    if (data.answerBox.title) parts.push(data.answerBox.title);
+  }
+
+  if (data.peopleAlsoAsk) {
+    for (const item of data.peopleAlsoAsk) {
+      if (item.answer) parts.push(item.answer);
+      if (item.snippet) parts.push(item.snippet);
+    }
+  }
+
+  if (data.organic) {
+    for (const result of data.organic) {
+      if (result.snippet) parts.push(result.snippet);
+    }
+  }
+
+  return parts.join('\n');
+}
+
 interface Contact {
   company_name: string;
   contact_name: string | null;
@@ -171,20 +321,31 @@ function extractWebsiteContact(result: SerperResult, company: Company, industry:
   // Try to extract company size from snippet if not already set
   const companySize = company.estimatedSize || estimateCompanySize(snippet);
   
-  // Try to extract person name and title from snippet
-  // Common patterns: "John Smith, CEO", "Jane Doe - Marketing Director"
+  // Try to extract person name and title from snippet or title (no /i flag on name part)
+  const textToSearch = (result.title || '') + ' ' + snippet;
   const namePatterns = [
-    /([A-Z][a-z]+\s+[A-Z][a-z]+),?\s*(CEO|CTO|CFO|COO|Founder|Owner|President|Director|Manager|VP|Vice President)/i,
-    /([A-Z][a-z]+\s+[A-Z][a-z]+)\s*[-–—]\s*(CEO|CTO|CFO|COO|Founder|Owner|President|Director|Manager|VP|Vice President)/i,
+    /([A-Z][a-z]+\s+[A-Z][a-z]+),?\s*(CEO|CTO|CFO|COO|CMO|CIO|Founder|Co-?Founder|Owner|President|Director|Managing Director|Manager|VP|Vice President|Partner|Chairman|Head of \w+)/,
+    /([A-Z][a-z]+\s+[A-Z][a-z]+)\s*[-–—]\s*(CEO|CTO|CFO|COO|CMO|CIO|Founder|Co-?Founder|Owner|President|Director|Managing Director|Manager|VP|Vice President|Partner|Chairman|Head of \w+)/,
+    /(CEO|CTO|CFO|COO|Founder|Co-?Founder|Owner|President)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/,
   ];
   
   for (const pattern of namePatterns) {
-    const match = snippet.match(pattern);
+    const match = textToSearch.match(pattern);
     if (match) {
+      let contactName: string;
+      let jobTitle: string;
+      if (/^(CEO|CTO|CFO|COO|Founder|Co-?Founder|Owner|President)/i.test(match[1])) {
+        jobTitle = match[1].trim();
+        contactName = match[2].trim();
+      } else {
+        contactName = match[1].trim();
+        jobTitle = match[2].trim();
+      }
+      if (!isValidPersonName(contactName)) continue;
       return {
         company_name: company.name,
-        contact_name: match[1].trim(),
-        job_title: match[2].trim(),
+        contact_name: contactName,
+        job_title: jobTitle,
         email: email,
         phone: phone,
         linkedin_url: null,
@@ -238,108 +399,127 @@ const DECISION_MAKER_ROLES = 'CEO OR CTO OR CFO OR COO OR CMO OR Founder OR Owne
 // Search for contacts at a specific company
 async function findCompanyContacts(company: Company, industry: string, location: string): Promise<Contact[]> {
   const contacts: Contact[] = [];
-  
-  // Search LinkedIn for decision makers at this company
-  try {
-    const linkedInQuery = `site:linkedin.com/in "${company.name}" "${DECISION_MAKER_ROLES}"`;
-    const linkedInResponse = await fetch(SERPER_URL, {
-      method: 'POST',
-      headers: {
-        'X-API-KEY': SERPER_API_KEY!,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        q: linkedInQuery,
-        num: 20,
-      }),
-    });
+  const seen = new Set<string>(); // Track unique contacts by name
 
-    if (linkedInResponse.ok) {
-      const linkedInData = await linkedInResponse.json();
-      
-      if (linkedInData.organic) {
-        for (const result of linkedInData.organic) {
-          const contact = extractLinkedInContact(result, company, industry, location);
-          if (contact && !contacts.some(c => c.contact_name === contact.contact_name)) {
-            contacts.push(contact);
+  const addContact = (contact: Contact | null) => {
+    if (!contact || !contact.contact_name) return;
+    const nameKey = contact.contact_name.toLowerCase().trim();
+    if (seen.has(nameKey)) return;
+    seen.add(nameKey);
+    contacts.push(contact);
+  };
+  
+  // Step 1: Google search (AI overview, knowledge graph, and organic results)
+  const googleQueries = [
+    `"${company.name}" ${location} (${DECISION_MAKER_ROLES})`,
+    `"${company.name}" ${location} (${DECISION_MAKER_ROLES}) (email OR phone OR contact)`,
+  ];
+
+  for (const query of googleQueries) {
+    try {
+      const response = await fetch(SERPER_URL, {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': SERPER_API_KEY!,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: query, num: 15 }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Log response keys for debugging
+        console.log(`Serper response keys for "${query}":`, Object.keys(data));
+
+        // Parse AI overview / answer box (richest source of executive data)
+        const aiText = collectAIText(data);
+        if (aiText) {
+          console.log(`AI text found (${aiText.length} chars) for "${company.name}"`);
+          const aiContacts = extractContactsFromText(aiText, company, industry, location);
+          for (const c of aiContacts) {
+            addContact(c);
+          }
+        }
+
+        // Parse knowledge graph attributes (Google often lists executives here)
+        if (data.knowledgeGraph?.attributes) {
+          const attrs = data.knowledgeGraph.attributes;
+          const roleKeys = ['ceo', 'cto', 'cfo', 'coo', 'founder', 'owner', 'president', 'director', 'chairman', 'head', 'chief'];
+          for (const [key, value] of Object.entries(attrs)) {
+            const keyLower = key.toLowerCase();
+            if (roleKeys.some(role => keyLower.includes(role)) && typeof value === 'string' && /^[A-Z]/.test(value)) {
+              addContact({
+                company_name: company.name,
+                contact_name: value.split('(')[0].trim(),
+                job_title: key,
+                email: null,
+                phone: company.phone,
+                linkedin_url: null,
+                website: company.website,
+                industry: industry,
+                location: location,
+                company_size: company.estimatedSize || null,
+                additional_info: { source: 'knowledge_graph' },
+              });
+            }
+          }
+        }
+
+        // Also try to extract contacts from knowledge graph description
+        if (data.knowledgeGraph?.description) {
+          const kgContacts = extractContactsFromText(data.knowledgeGraph.description, company, industry, location);
+          for (const c of kgContacts) {
+            addContact(c);
+          }
+        }
+
+        // Parse organic results (LinkedIn profiles + general web pages)
+        for (const result of (data.organic || [])) {
+          if (result.link?.includes('linkedin.com/in/')) {
+            addContact(extractLinkedInContact(result, company, industry, location));
+          } else {
+            addContact(extractWebsiteContact(result, company, industry, location));
           }
         }
       }
+    } catch (error) {
+      console.error(`Error in Google search for ${company.name}:`, error);
     }
-  } catch (error) {
-    console.error(`Error searching LinkedIn for ${company.name}:`, error);
+
+    await new Promise(r => setTimeout(r, 100));
   }
 
-  // Search for team/about pages on company website
+  // Step 2: Search the company's own website for additional contacts with emails
   if (company.website) {
     try {
       const domain = new URL(company.website).hostname;
-      const teamQuery = `site:${domain} (team OR about OR contact OR leadership) email`;
-      
-      const teamResponse = await fetch(SERPER_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': SERPER_API_KEY!,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: teamQuery,
-          num: 5,
-        }),
-      });
+      const websiteQueries = [
+        `site:${domain} (team OR leadership OR "about us" OR "our team") (${DECISION_MAKER_ROLES})`,
+        `site:${domain} (contact OR email) "@${domain.replace('www.', '')}"`,
+      ];
 
-      if (teamResponse.ok) {
-        const teamData = await teamResponse.json();
-        
-        if (teamData.organic) {
-          for (const result of teamData.organic) {
-            const contact = extractWebsiteContact(result, company, industry, location);
-            if (contact && !contacts.some(c => 
-              c.contact_name === contact.contact_name || 
-              (c.email && c.email === contact.email)
-            )) {
-              contacts.push(contact);
-            }
+      for (const query of websiteQueries) {
+        const response = await fetch(SERPER_URL, {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': SERPER_API_KEY!,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ q: query, num: 10 }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          for (const result of (data.organic || [])) {
+            addContact(extractWebsiteContact(result, company, industry, location));
           }
         }
+
+        await new Promise(r => setTimeout(r, 100));
       }
     } catch (error) {
       console.error(`Error searching website for ${company.name}:`, error);
-    }
-  }
-
-  // If no contacts found, search for company + owner/CEO
-  if (contacts.length === 0) {
-    try {
-      const ownerQuery = `"${company.name}" ${location} (CEO OR CTO OR founder OR owner OR president OR director) (email OR phone OR contact)`;
-      
-      const ownerResponse = await fetch(SERPER_URL, {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': SERPER_API_KEY!,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: ownerQuery,
-          num: 5,
-        }),
-      });
-
-      if (ownerResponse.ok) {
-        const ownerData = await ownerResponse.json();
-        
-        if (ownerData.organic) {
-          for (const result of ownerData.organic) {
-            const contact = extractWebsiteContact(result, company, industry, location);
-            if (contact) {
-              contacts.push(contact);
-              break; // Just get one
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Error searching owner for ${company.name}:`, error);
     }
   }
 
@@ -459,24 +639,40 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Find contacts for each company (limit to first 8 to save API calls)
     const allContacts: Contact[] = [];
+    const globalSeen = new Set<string>();
     const companiesToProcess = companies.slice(0, 8);
     
     for (const company of companiesToProcess) {
       const contacts = await findCompanyContacts(company, industry, location);
-      allContacts.push(...contacts);
+      for (const contact of contacts) {
+        const nameKey = (contact.contact_name || '').toLowerCase().trim();
+        if (nameKey && !globalSeen.has(nameKey)) {
+          globalSeen.add(nameKey);
+          allContacts.push(contact);
+        }
+      }
       
       // Small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Filter to only include contacts with at least one contact method
-    const validContacts = allContacts.filter(c => 
-      c.linkedin_url || c.email || c.phone
-    );
+    // For contacts without a LinkedIn URL, generate a LinkedIn search link
+    for (const contact of allContacts) {
+      if (!contact.linkedin_url && contact.contact_name) {
+        const searchName = encodeURIComponent(`${contact.contact_name} ${contact.company_name}`);
+        contact.linkedin_url = `https://www.linkedin.com/search/results/people/?keywords=${searchName}`;
+        contact.additional_info = {
+          ...contact.additional_info,
+          linkedin_is_search: true,
+        };
+      }
+    }
+
+    console.log(`Total contacts found: ${allContacts.length}`);
 
     return NextResponse.json({
-      leads: validContacts,
-      total: validContacts.length,
+      leads: allContacts,
+      total: allContacts.length,
       companies_searched: companiesToProcess.length,
     });
 
